@@ -1,0 +1,9 @@
+{
+  "name": "Belanja Keluarga Halimah",
+  "short_name": "Belanja",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0d0b07",
+  "theme_color": "#14110a",
+  "icons": [{ "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
