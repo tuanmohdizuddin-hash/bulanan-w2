@@ -86,8 +86,8 @@ input[type=month]{width:auto}
 .amt-row{display:flex;gap:10px;align-items:stretch}
 .amt{position:relative;flex:1}
 .amt span{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--gold-2);font-weight:700}
-.amt input{padding-left:46px;font-size:22px;font-weight:700;height:56px;font-variant-numeric:tabular-nums}
-.mic{width:56px;height:56px;border-radius:16px;border:0;background:var(--gold-grad);color:var(--ink);cursor:pointer;display:grid;place-items:center;flex:0 0 auto;box-shadow:0 6px 22px rgba(226,184,74,.35);transition:.2s}
+.amt input{padding-left:46px;touch-action:manipulation;font-size:22px;font-weight:700;height:56px;font-variant-numeric:tabular-nums}
+.mic{touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;width:56px;height:56px;border-radius:16px;border:0;background:var(--gold-grad);color:var(--ink);cursor:pointer;display:grid;place-items:center;flex:0 0 auto;box-shadow:0 6px 22px rgba(226,184,74,.35);transition:.2s}
 .mic svg{width:24px;height:24px}
 .mic.rec{background:linear-gradient(135deg,#ff9b8a,#e0453a);color:#fff;animation:pulse 1.2s infinite}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,120,100,.6)}100%{box-shadow:0 0 0 18px rgba(255,120,100,0)}}
@@ -201,7 +201,7 @@ dialog .act{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
         <h2>Tambah Perbelanjaan <span class="tag">🎙 Suara atau Taip</span></h2>
         <form class="entry" id="form" autocomplete="off">
           <div class="amt-row">
-            <label class="amt"><span>RM</span><input id="fAmt" type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" required aria-label="Jumlah"></label>
+            <label class="amt"><span>RM</span><input id="fAmt" type="text" inputmode="decimal" enterkeyhint="done" placeholder="0.00" aria-label="Jumlah"></label>
             <button type="button" class="mic" id="mic" aria-label="Rekod suara">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
             </button>
@@ -213,7 +213,7 @@ dialog .act{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
           </div>
           <div class="row2">
             <div><label class="lbl" for="fWho">Untuk siapa</label><select id="fWho"></select></div>
-            <div><label class="lbl" for="fDate">Tarikh</label><input id="fDate" type="date" required></div>
+            <div><label class="lbl" for="fDate">Tarikh</label><input id="fDate" type="date"></div>
           </div>
           <div><label class="lbl" for="fNote">Catatan</label><input id="fNote" placeholder="cth: Nasi lemak, susu Rufaida, buku sekolah…"></div>
           <button class="btn gold" type="submit">＋ Simpan Perbelanjaan</button>
@@ -470,13 +470,21 @@ $('#cats').addEventListener('click',e=>{
 });
 $('#month').addEventListener('change',e=>{if(e.target.value){sel.month=e.target.value;render();}});
 let lastVia='typed';
+function parseAmt(v){v=String(v).replace(/rm/i,'').replace(/\s/g,'');
+  if(/^\d{1,3}(\.\d{3})+(,\d{1,2})?$/.test(v)) v=v.replace(/\./g,'').replace(',','.');      // 1.234,50
+  else if(/,\d{1,2}$/.test(v) && !v.includes('.')) v=v.replace(',','.');                       // 12,50
+  else v=v.replace(/,/g,'');                                                                     // 1,234.50
+  return /^\d*\.?\d+$/.test(v)?parseFloat(v):NaN;}
 $('#form').addEventListener('submit',e=>{
   e.preventDefault();
-  const amt=parseFloat($('#fAmt').value);
-  if(!(amt>0)){toast('Masukkan jumlah yang sah');return;}
+  const amt=parseAmt($('#fAmt').value);
+  if(!(amt>0)){toast('Masukkan jumlah yang sah');$('#fAmt').focus();return;}
+  if(!$('#fDate').value) $('#fDate').value=ymd(new Date());
   const t={id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),amt:Math.round(amt*100)/100,cat:sel.cat,who:$('#fWho').value,date:$('#fDate').value,note:$('#fNote').value.trim(),via:lastVia,ts:Date.now()};
   state.tx.push(t); save();
   $('#fAmt').value=''; $('#fNote').value=''; lastVia='typed';
+  if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  vHint.innerHTML=HINT_IDLE;
   sel.month=t.date.slice(0,7); $('#month').value=sel.month;
   render(); toast(`Disimpan: ${fmt(t.amt)} · ${t.cat}`);
 });
@@ -543,30 +551,89 @@ function parseVoice(raw){
   return {amt,who,cat,date,note};
 }
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let rec=null, recOn=false;
-$('#mic').addEventListener('click',()=>{
-  if(!SR){toast('Pelayar ini tidak sokong suara. Cuba Chrome / Safari terkini.');return;}
-  if(recOn){rec.stop();return;}
-  rec=new SR(); rec.lang='ms-MY'; rec.interimResults=true; rec.maxAlternatives=1;
-  rec.onstart=()=>{recOn=true;$('#mic').classList.add('rec');$('#vHint').innerHTML='🎙 Sedang mendengar… sebut jumlah, kategori & untuk siapa';};
-  rec.onresult=e=>{
-    const txt=[...e.results].map(r=>r[0].transcript).join(' ');
-    $('#vHint').innerHTML='“<b>'+esc(txt)+'</b>”';
-    if(e.results[e.results.length-1].isFinal){
-      const r=parseVoice(txt);
-      if(r.amt!=null) $('#fAmt').value=r.amt.toFixed(2);
-      if(r.who) $('#fWho').value=r.who;
-      if(r.cat){sel.cat=r.cat;buildCats();}
-      if(r.date) $('#fDate').value=r.date;
-      if(r.note) $('#fNote').value=r.note;
-      lastVia='voice';
-      $('#vHint').innerHTML = r.amt!=null ? `✅ Faham: <b>${fmt(r.amt)}</b> · ${esc(sel.cat)} · ${esc(person($('#fWho').value).short)} — semak & tekan Simpan` : '⚠️ Jumlah tidak dikesan, sila taip jumlah.';
-    }
+/* Voice state machine. Chrome Android is unreliable here: `onend` sometimes never
+   fires (so a simple on/off flag gets stuck "on" and later taps only call stop()
+   on a dead instance), and each result repeats the whole phrase so far. So:
+   - a fresh recognizer per tap, with events from older ones ignored;
+   - watchdog timers that reset the state even when `onend` never arrives;
+   - only the latest result is read, and the last heard phrase is applied on end
+     even if no result was marked final. */
+const V={rec:null,state:'idle',heard:'',applied:false,timers:[]};
+const micBtn=$('#mic'), vHint=$('#vHint');
+const HINT_IDLE=vHint.innerHTML;
+function vClear(){V.timers.forEach(clearTimeout);V.timers=[];}
+function vLater(fn,ms){V.timers.push(setTimeout(fn,ms));}
+function vUI(on){micBtn.classList.toggle('rec',on);micBtn.setAttribute('aria-pressed',on?'true':'false');micBtn.setAttribute('aria-label',on?'Berhenti rekod':'Rekod suara');}
+function applyVoice(txt){
+  txt=(txt||'').trim(); if(!txt) return false;
+  const r=parseVoice(txt);
+  if(r.amt!=null) $('#fAmt').value=r.amt.toFixed(2);
+  if(r.who) $('#fWho').value=r.who;
+  if(r.cat){sel.cat=r.cat;buildCats();}
+  if(r.date) $('#fDate').value=r.date;
+  if(r.note) $('#fNote').value=r.note;
+  lastVia='voice';
+  vHint.innerHTML = r.amt!=null
+    ? `✅ “${esc(txt)}” → <b>${fmt(r.amt)}</b> · ${esc(sel.cat)} · ${esc(person($('#fWho').value).short)} — semak & tekan Simpan`
+    : `⚠️ “${esc(txt)}” — jumlah tidak dikesan, sila taip jumlah atau cuba lagi.`;
+  return true;
+}
+// Finish a session exactly once, whichever of onend / onerror / watchdog comes first.
+function vFinish(r,msg){
+  if(r!==V.rec) return;
+  vClear();
+  const old=V.rec; V.rec=null; V.state='idle';
+  old.onstart=old.onresult=old.onerror=old.onend=old.onspeechend=null;
+  try{old.abort();}catch(e){}
+  vUI(false);
+  if(!V.applied && V.heard){V.applied=true;applyVoice(V.heard);}
+  else if(msg) vHint.innerHTML=msg;
+  else if(!V.applied) vHint.innerHTML=HINT_IDLE;
+}
+function vStart(){
+  if(!SR){toast('Pelayar ini tidak sokong suara. Cuba Chrome terkini.');return;}
+  if(!window.isSecureContext){toast('Suara perlukan pautan https:// (cth: GitHub Pages)');return;}
+  if(document.activeElement && document.activeElement.blur) document.activeElement.blur(); // tutup papan kekunci
+  const r=new SR();
+  r.lang='ms-MY'; r.interimResults=true; r.continuous=false; r.maxAlternatives=1;
+  V.rec=r; V.state='starting'; V.heard=''; V.applied=false;
+  r.onstart=()=>{ if(r!==V.rec) return; V.state='listening';
+    vHint.innerHTML='🎙 Sedang mendengar… sebut jumlah, kategori & untuk siapa. Tekan lagi untuk berhenti.'; };
+  r.onresult=e=>{
+    if(r!==V.rec) return;
+    const last=e.results[e.results.length-1];   // Android: latest result already holds the full phrase
+    V.heard=last[0].transcript;
+    if(last.isFinal){ V.applied=true; applyVoice(V.heard); V.state='stopping';
+      try{r.stop();}catch(_){}
+      vLater(()=>vFinish(r),1200); }
+    else vHint.innerHTML='🎙 “<b>'+esc(V.heard)+'</b>”';
   };
-  rec.onerror=e=>{toast(e.error==='not-allowed'?'Benarkan akses mikrofon dahulu':'Ralat suara: '+e.error);};
-  rec.onend=()=>{recOn=false;$('#mic').classList.remove('rec');};
-  try{rec.start();}catch(e){toast('Tidak dapat mula rekod');}
-});
+  r.onerror=e=>{
+    if(r!==V.rec) return;
+    const m={'not-allowed':'🔒 Benarkan akses mikrofon untuk laman ini (ikon 🔒 di bar alamat).',
+      'service-not-allowed':'🔒 Benarkan akses mikrofon untuk laman ini.',
+      'no-speech':'🤫 Tiada suara dikesan. Tekan 🎙 dan cuba lagi.',
+      'audio-capture':'🎤 Mikrofon tidak dijumpai atau sedang digunakan aplikasi lain.',
+      'network':'📶 Tiada sambungan internet — suara perlukan internet. Sila taip dahulu.',
+      'language-not-supported':'Bahasa Melayu tidak disokong peranti ini.'}[e.error];
+    vFinish(r, e.error==='aborted' ? null : (m||'⚠️ Ralat suara ('+esc(e.error)+'). Cuba lagi.'));
+  };
+  r.onend=()=>vFinish(r);
+  vUI(true); vHint.innerHTML='🎙 Bersedia…';
+  vLater(()=>{ if(r===V.rec && V.state==='starting') vFinish(r,'⚠️ Mikrofon tidak bermula. Tekan 🎙 sekali lagi.'); },6000);
+  vLater(()=>{ if(r===V.rec){ V.state='stopping'; try{r.stop();}catch(_){} vLater(()=>vFinish(r),1500);} },15000);
+  try{ r.start(); }catch(err){ vFinish(r,'⚠️ Tidak dapat mula rekod. Tekan 🎙 sekali lagi.'); }
+}
+function vStop(){
+  const r=V.rec; if(!r) return;
+  if(V.state==='stopping'){ vFinish(r); return; }  // second tap while stopping: force reset now
+  V.state='stopping';
+  try{ r.stop(); }catch(e){}
+  vLater(()=>vFinish(r),1500);                      // in case onend never fires
+}
+micBtn.addEventListener('click',()=>{ V.rec ? vStop() : vStart(); });
+document.addEventListener('visibilitychange',()=>{ if(document.hidden && V.rec) vFinish(V.rec); });
+$('#fAmt').addEventListener('input',()=>{ lastVia='typed'; });
 
 /* ---------- init ---------- */
 $('#month').value=sel.month; $('#fDate').value=ymd(new Date());
