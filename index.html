@@ -126,7 +126,8 @@ input[type=month]{width:auto}
 .insight{margin-top:14px;padding:12px 14px;border-radius:14px;background:rgba(226,184,74,.08);border:1px solid var(--line);font-size:13px;line-height:1.55;color:var(--silver-1)}
 .insight b{color:var(--gold-1)}
 
-.persons{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.persons{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media (max-width:420px){.persons{grid-template-columns:repeat(2,1fr)}}
 .pc{padding:12px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid var(--line-s);text-align:center}
 .pc .av{width:42px;height:42px;border-radius:50%;margin:0 auto 6px;display:grid;place-items:center;font-weight:700;color:var(--ink);font-family:"Playfair Display";font-size:18px}
 .pc .nm{font-size:12.5px;color:var(--silver-2)}
@@ -169,7 +170,7 @@ dialog .act{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
       <div class="logo">H</div>
       <div>
         <h1>Belanja Keluarga Halimah</h1>
-        <div class="sub">Ibu Halimah · Raihani · Rufaida</div>
+        <div class="sub">Ibu Halimah · Raihani · Rufaida · Perodua 524</div>
       </div>
     </div>
     <div class="hdr-r">
@@ -212,7 +213,7 @@ dialog .act{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
             <div class="chips" id="cats"></div>
           </div>
           <div class="row2">
-            <div><label class="lbl" for="fWho">Untuk siapa</label><select id="fWho"></select></div>
+            <div><label class="lbl" for="fWho">Untuk siapa / apa</label><select id="fWho"></select></div>
             <div><label class="lbl" for="fDate">Tarikh</label><input id="fDate" type="date"></div>
           </div>
           <div><label class="lbl" for="fNote">Catatan</label><input id="fNote" placeholder="cth: Nasi lemak, susu Rufaida, buku sekolah…"></div>
@@ -242,7 +243,7 @@ dialog .act{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
       </section>
 
       <section class="glass card">
-        <h2>Ikut Ahli Keluarga</h2>
+        <h2>Ikut Keluarga &amp; Kereta</h2>
         <div class="persons" id="persons"></div>
       </section>
 
@@ -285,13 +286,16 @@ const PEOPLE = [
   {id:'halimah', name:'Ibu Halimah', short:'Halimah', color:'#e2b84a'},
   {id:'raihani', name:'Raihani', short:'Raihani', color:'#c9ccd3'},
   {id:'rufaida', name:'Rufaida', short:'Rufaida', color:'#f2a7b8'},
+  {id:'perodua', name:'Perodua 524', short:'Perodua 524', color:'#8fb4d6', icon:'🚙'},
 ];
+// "Perodua 524" (also by voice: "perodua lima dua empat") — 524 is the plate, not an amount
+const CAR_RE=/\b(?:pero?dua|produa|pedua|kereta|myvi|axia|bezza|alza|aruz|ativa)\s+(?:524|lima\s+dua\s+empat|lima\s+ratus\s+dua\s+puluh\s+empat)\b(?!\s*(?:ringgit|rm|sen|\.\d))/gi;
 const DEFAULT_CATS = [
   {name:'Makanan', icon:'🍛', kw:['makan','makanan','nasi','minum','kedai','restoran','sarapan','lunch','tengahari','malam','roti','kuih','mamak','ayam','mee']},
   {name:'Barang Dapur', icon:'🛒', kw:['dapur','barang dapur','pasar','grocery','sayur','ikan','beras','minyak','telur','gula','mydin','lotus','giant','pasaraya']},
   {name:'Susu & Lampin', icon:'🍼', kw:['susu','lampin','pampers','diaper','bayi','tisu basah']},
   {name:'Pendidikan', icon:'📚', kw:['sekolah','buku','yuran','tadika','taska','alat tulis','pendidikan','kelas','mengaji']},
-  {name:'Pengangkutan', icon:'🚗', kw:['minyak kereta','petrol','grab','tol','parking','kereta','teksi','bas','pengangkutan']},
+  {name:'Pengangkutan', icon:'🚗', kw:['minyak kereta','petrol','grab','tol','parking','kereta','teksi','bas','pengangkutan','servis','tayar','roadtax','road tax','cukai jalan','insurans kereta','cuci kereta','minyak hitam','bateri','bengkel','ansuran kereta']},
   {name:'Bil & Utiliti', icon:'💡', kw:['bil','api','elektrik','air','internet','wifi','telefon','tnb','astro','utiliti','sewa']},
   {name:'Kesihatan', icon:'🩺', kw:['klinik','ubat','doktor','hospital','vitamin','kesihatan','farmasi']},
   {name:'Pakaian', icon:'👗', kw:['baju','pakaian','tudung','kasut','seluar','kain','telekung']},
@@ -445,7 +449,8 @@ function renderPersons(){
   const m = state.tx.filter(t=>t.date.startsWith(sel.month));
   $('#persons').innerHTML = PEOPLE.map(p=>{
     const v=sum(m.filter(t=>t.who===p.id));
-    return `<div class="pc"><div class="av" style="background:${p.id==='halimah'?'var(--gold-grad)':p.id==='raihani'?'var(--silver-grad)':'linear-gradient(135deg,#ffe1e8,#e8a0b2)'}">${p.short[0]}</div><div class="nm">${esc(p.short)}</div><div class="vv">${fmt0(v)}</div></div>`;
+    const bg={halimah:'var(--gold-grad)',raihani:'var(--silver-grad)',rufaida:'linear-gradient(135deg,#ffe1e8,#e8a0b2)',perodua:'linear-gradient(135deg,#e8f1fa,#8fb4d6 55%,#5d7f9e)'}[p.id];
+    return `<div class="pc"><div class="av" style="background:${bg}">${p.icon||p.short[0]}</div><div class="nm">${esc(p.short)}</div><div class="vv">${fmt0(v)}</div></div>`;
   }).join('');
 }
 
@@ -522,6 +527,8 @@ function wordsToNumber(str){
   });
 }
 function parseVoice(raw){
+  const isCar=new RegExp(CAR_RE.source,'i').test(raw)||/\b(pero?dua|produa|myvi|axia|bezza|alza|aruz|ativa|kereta)\b/i.test(raw);
+  raw=raw.replace(CAR_RE,' ');
   let s=' '+wordsToNumber(raw.toLowerCase()).replace(/,/g,'.')+' ';
   let amt=null;
   let m=s.match(/(\d+(?:\.\d+)?)\s*(?:ringgit|rm)?\s*(?:dan\s*)?(\d{1,2})\s*sen/);
@@ -533,7 +540,7 @@ function parseVoice(raw){
   if(amt===null){m=s.match(/(\d+)\s*sen/);if(m)amt=parseFloat(m[1])/100;}
   // person
   let who=null;
-  if(/raihan/.test(s))who='raihani'; else if(/rufaid|ruf?aida|rofaida/.test(s))who='rufaida'; else if(/halimah|ibu|mama|umi|saya/.test(s))who='halimah';
+  if(isCar)who='perodua'; else if(/raihan/.test(s))who='raihani'; else if(/rufaid|ruf?aida|rofaida/.test(s))who='rufaida'; else if(/halimah|ibu|mama|umi|saya/.test(s))who='halimah';
   // category: custom cats by name first, then keywords
   let cat=null;
   for(const c of state.cats){ if(s.includes(' '+c.name.toLowerCase())){cat=c.name;break;} }
@@ -545,7 +552,7 @@ function parseVoice(raw){
   let note=raw.replace(/\b(rm|ringgit|sen|untuk|bagi|kepada|beli|belanja|hari ini|semalam|kelmarin|dan)\b/gi,' ')
     .replace(/\d+([.,]\d+)?/g,' ');
   note=wordsToNumber(note).replace(/\d+/g,' ');
-  ['raihani','rufaida','halimah','ibu','saya'].forEach(n=>note=note.replace(new RegExp('\\b'+n+'\\b','gi'),' '));
+  ['raihani','rufaida','halimah','ibu','saya','perodua','produa','myvi'].forEach(n=>note=note.replace(new RegExp('\\b'+n+'\\b','gi'),' '));
   if(cat) note=note.replace(new RegExp('\\b'+cat.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','gi'),' ');
   note=note.replace(/\s+/g,' ').trim(); if(note) note=note[0].toUpperCase()+note.slice(1);
   return {amt,who,cat,date,note};
